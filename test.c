@@ -40,7 +40,9 @@ int show_file_info(const char *path){
 	printf("Owner UID: %d\n", file_info.st_uid);
 
 	struct passwd *pw = getpwuid(file_info.st_uid);
-	printf("Owner: %s\n", pw->pw_name);
+	if (pw != NULL) {	
+		printf("Owner: %s\n", pw->pw_name);
+	}
 
 	return 0;
 }
@@ -100,21 +102,44 @@ void list_directory(const char *path){
 	closedir(dir);
 }
 
-int main() {
-    create_file("hello.txt");
-    show_file_info("hello.txt");
-    show_permissions("hello.txt");
+void show_identity(){
 
-    printf("\nChanging permissions to 755...\n");
-    change_permissions("hello.txt", 0755);
-    show_permissions("hello.txt");
+	uid_t uid = getuid();
+	struct passwd *pw = getpwuid(uid);
 
-    printf("Directory listing:\n");
-    list_directory(".");
+	if (pw == NULL) {
+		printf("Unknown user (UID %d)\n", uid);
+		return;
 
+	}
+	printf("Running as: %s (UID %d)\n", pw->pw_name, uid);
 
-    delete_file("hello.txt");
+}
 
-    return 0;
+int check_access( const char *path, int mode){
+	int result = access(path, mode);
+	
+	if (result == -1){
+		perror("access");
+		return -1;
+	}
+
+	return 0;
+
+}
+
+int main(int argc, char *argv[]) {
+	if(argc < 2){
+		printf("Usage: %s <file>\n",argv[0]);
+		return 1;
+
+	}
+	show_identity();
+
+	printf( "Can read? %s\n", check_access(argv[1], R_OK) == 0 ? "yes" : "no");
+	printf( "Can write? %s\n", check_access(argv[1], W_OK) == 0 ? "yes" : "no");
+	printf( "Can exec? %s\n", check_access(argv[1], X_OK) == 0? "yes" : "no");
+
+	return 0;
 }
 
