@@ -1,51 +1,65 @@
 # Linux File Management & Access Control System with Activity Logging
 
-A C program built on real Linux POSIX syscalls that manages files,
-enforces access control using actual Linux user permissions, and
-logs every action performed.
+A C program built on POSIX syscalls that manages files, uses the real Linux
+permission system for access control, and records every action (including
+denials) to a shared activity log.
 
-## Concept
+## How it works
 
-Real Linux user accounts (not custom login) act as the "users" of
-the system. The kernel's own permission system (owner/group/other,
-chmod/chown) enforces who can do what — the program reads and
-displays this, and logs every attempted operation.
+Linux already enforces file permissions in the kernel. This project does not
+replace that. It adds what Linux does not provide by default: a readable record
+of who did what, and when, including denied attempts. Users are real Linux
+accounts, and identity comes from `getuid()` / `getpwuid()`, so there is no
+custom login.
+
+## Features
+
+- Create, delete, list files (`open`, `unlink`, `opendir`/`readdir`)
+- File metadata and permission display (`stat`, bitwise decoding of `st_mode`)
+- Change permissions (`chmod`)
+- Permission checks before acting (`access`)
+- Activity log with timestamp, user, action, target, result
+- Failures are logged with the kernel's error reason (`errno`)
+- Automatic log rotation at 1 MB (`stat` + `rename`) so the log cannot fill the disk
+
+## Build and run
+
+```bash
+gcc -Wall -Wextra filemgr.c -o filemgr
+mkdir -p /tmp/fmlog && chmod 777 /tmp/fmlog
+./filemgr
+```
+
+## Demo: access denial between two users
+
+```bash
+echo "top secret" > /tmp/secret.txt
+chmod 600 /tmp/secret.txt
+cp filemgr /tmp/filemgr
+chmod 666 /tmp/fmlog/activity.log      # after the first run creates it
+sudo -u bob /tmp/filemgr                # option 6, path /tmp/secret.txt
+./filemgr                               # option 7 shows bob's denials
+```
+
+Example log output:
+
+```
+[2026-10-19 05:13:16] user=bob action=ACCESS_READ target=/tmp/secret.txt result=Permission denied
+```
+
 ## Progress
 
-- [x] `create_file()` — using `open()` with `O_CREAT | O_EXCL`
-- [x] `delete_file()` — using `unlink()`
-- [x] `show_file_info()` — using `stat()` for size and owner
-- [x] `show_permissions()` — decoding `st_mode` bits for owner/group/other
-- [x] `change_permissions()` — using `chmod()`
-- [x] `list_directory()` — using `opendir()`/`readdir()`/`closedir()`
-- [ ] `chown()` — change file ownership
-- [ ] Real permission-based access control (using real Linux users, `access()`)
-- [ ] Activity logging to `logs/activity.log`
-- [ ] Menu-driven interface tying everything together
+- [x] Stage 1: File management syscalls
+- [x] Stage 2: Identity and access checks
+- [x] Stage 3: Activity logging and menu interface
+- [x] Log rotation
+- [ ] Future work: inotify real-time monitor, per-user disk quota, anomaly alerts
 
-## Concepts used so far
+## Known limitations
 
-- File descriptors and the `open()`/`close()` lifecycle
-- `errno` and `perror()` for syscall error handling
-- `O_CREAT` / `O_EXCL` flags and why atomic create-vs-overwrite behavior
-  matters for a file manager
-- `unlink()` and why Linux calls file deletion "unlinking" (filenames
-  are links to data, not the data itself)
-- Inodes and `stat()` — how the kernel stores file metadata separately
-  from file content
-- Pointers and the "give me a box, I'll fill it in" pattern (`&file_info`)
-- Bitwise AND (`&`) for checking individual permission flags in `st_mode`
-- `chmod()` for changing permission bits, and verifying the change by
-  re-reading the file's real state afterward
-- Directory iteration with `opendir()`/`readdir()`/`closedir()`
-
-## Build & Run
-
-\`\`\`bash
-gcc test.c -o test
-./test
-\`\`\`
-
-(Will be updated to `make`/`./filemgr` once the project is split
-into proper modules.)
-
+- The log is world-writable so every user can record events, which means it
+  could also be edited. A stronger design would use a dedicated group with
+  append-only rights (`chattr +a`).
+- The log lives in `/tmp/fmlog` because Ubuntu's `fs.protected_regular`
+  setting blocks other users from appending to files they do not own inside
+  `/tmp` itself.
