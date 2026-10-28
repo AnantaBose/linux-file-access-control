@@ -9,6 +9,8 @@
 #include "analysis.h"
 #include "monitor.h"
 #include "diskacct.h"
+#include "users.h"
+#include "policy.h"
 
 static void read_line(const char *prompt, char *buf, size_t size) {
     printf("%s", prompt);
@@ -32,11 +34,25 @@ static void print_menu(void) {
     printf("9. Analyze log (summary + alerts)\n");
     printf("10. Monitor a directory (real-time)\n");
  printf("11. Disk usage report\n");
+    printf("12. List users\n");
+    printf("13. List groups\n");
+    printf("14. Show a user's groups\n");
+    printf("15. Who can access a file?\n");
+    printf("16. Create user (needs sudo)\n");
+    printf("17. Show roles and powers\n");
+    printf("18. User database (roles)\n");
+    printf("19. New managed file\n");
+    printf("20. Read managed file\n");
+    printf("21. Append to managed file\n");
+    printf("22. Delete managed file\n");
+    printf("23. Grant access\n");
+    printf("24. Revoke access\n");
+    printf("25. File access report\n");
     printf("0. Exit\n");
 }
 
 int main(void) {
-    char choice[16], path[512], text[64];
+        char choice[16], path[512], text[512], who[64], pw[16];
 
     show_identity();
 
@@ -96,6 +112,62 @@ case 10:
             case 11:
                 read_line("Directory to scan (e.g. .): ", path, sizeof(path));
                 disk_report(path);
+                break;
+            case 12:
+                list_users();
+                break;
+            case 13:
+                list_groups();
+                break;
+            case 14:
+                read_line("User name: ", text, sizeof(text));
+                show_user_groups(text);
+                break;
+            case 15:
+                read_line("File path: ", path, sizeof(path));
+                access_matrix(path);
+                break;
+            case 16:
+                read_line("New user name (a_ admin, m_ manager, u_ user): ", who, sizeof(who));
+                policy_create_user(who);
+                break;
+            case 17:
+                policy_show_roles();
+                break;
+            case 18:
+                policy_list_users();
+                break;
+            case 19:
+                read_line("New managed file name: ", path, sizeof(path));
+                policy_new_file(path);
+                break;
+case 20:
+                read_line("Managed file name: ", path, sizeof(path));
+                policy_read_file(path);
+                break;
+            case 21:
+                read_line("Managed file name: ", path, sizeof(path));
+                read_line("Text to append: ", text, sizeof(text));
+                policy_write_file(path, text);
+                break;
+            case 22:
+                read_line("Managed file name: ", path, sizeof(path));
+                policy_delete_file(path);
+                break;
+            case 23:
+                read_line("Managed file name: ", path, sizeof(path));
+                read_line("Give access to user: ", who, sizeof(who));
+                read_line("Powers (r, w, d): ", pw, sizeof(pw));
+                policy_grant(path, who, pw);
+                break;
+            case 24:
+                read_line("Managed file name: ", path, sizeof(path));
+                read_line("Take access from user: ", who, sizeof(who));
+                policy_revoke(path, who);
+                break;
+            case 25:
+                read_line("Managed file name: ", path, sizeof(path));
+                policy_file_report(path);
                 break;
             case 0:
                 return 0;
